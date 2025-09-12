@@ -1,0 +1,2 @@
+path,name,size
+dbfs:/databricks-datasets/learning-spark-v2/sf-fire/sf-fire-calls.csv,sf-fire-calls.csv,1137925359
