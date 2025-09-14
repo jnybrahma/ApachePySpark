@@ -175,6 +175,54 @@ wheel                   0.45.1
 zipp                    3.23.0
 
 (FirstSparkDemo) C:\Users\User>
+
+%-------------------------------------------------------------------------------------%
+## Project python 3.9. environment  .venv used in project. 
+
+C:\>cd C:\Udemy_Course\ApacheSparkePython\Projects\.venv\Scripts
+
+C:\Udemy_Course\ApacheSparkePython\Projects\.venv\Scripts> 
+
+C:\Udemy_Course\ApacheSparkePython\Projects\.venv\Scripts> activate
+
+(.venv) C:\Udemy_Course\ApacheSparkePython\Projects\.venv\Scripts>
+
+(.venv) C:\Udemy_Course\ApacheSparkePython\Projects\.venv\Scripts>pip list
+Package         Version
+--------------- -----------
+findspark       2.0.1
+grpcio          1.74.0
+numpy           2.0.2
+pandas          2.3.2
+pip             25.0.1
+py4j            0.10.9.9
+pyarrow         21.0.0
+pyspark         3.4.4
+python-dateutil 2.9.0.post0
+pytz            2025.2
+setuptools      80.3.1
+six             1.17.0
+tzdata          2025.2
+
+
+(.venv) C:\Udemy_Course\ApacheSparkePython\Projects\.venv\Scripts> python --version
+Python 3.9.13
+
+(.venv) C:\Udemy_Course\ApacheSparkePython\Projects\.venv\Scripts> 
+(.venv) C:\Udemy_Course\ApacheSparkePython\Projects\.venv\Scripts> pip install findspark
+Collecting findspark
+  Using cached findspark-2.0.1-py2.py3-none-any.whl.metadata (352 bytes)
+Using cached findspark-2.0.1-py2.py3-none-any.whl (4.4 kB)
+Installing collected packages: findspark
+Successfully installed findspark-2.0.1
+
+[notice] A new release of pip is available: 25.0.1 -> 25.2
+[notice] To update, run: python.exe -m pip install --upgrade pip
+
+(.venv) C:\Udemy_Course\ApacheSparkePython\Projects\.venv\Scripts>
+
+
+
 %----------------------------- Databricks Sample Example ----------------%
 df = (spark.read 
       .formatt("csv")
@@ -1271,14 +1319,174 @@ It was the primary user-facing API in Spark's early versionsand serves as the lo
 
 
 %----------------------------------------- Section-9 Aggregations in Apache Spark -----------------------------------------%
+## Grouping Aggregations
 
+
+
+## Windowing Aggregations
 
 
 
 %----------------------------------------- Section-10 Spark Dataframe Joins  ----------------------------------------------%
 
+## Dataframe Joins and column name ambiguity
+
+---------------------------------------------------------------------------------------
+from pyspark.sql import SparkSession
+
+from lib.logger import Log4J
+
+if __name__ == "__main__":
+    spark = SparkSession \
+        .builder \
+        .appName("Grouping Demo") \
+        .master("local[2]") \
+        .getOrCreate()
+
+    logger = Log4J(spark)
+
+    orders_list = [("01", "02", 350, 1),
+                   ("01", "04", 580, 1),
+                   ("01", "07", 320, 2),
+                   ("02", "03", 450, 1),
+                   ("02", "06", 220, 1),
+                   ("03", "01", 195, 1),
+                   ("04", "09", 270, 3),
+                   ("04", "08", 410, 2),
+                   ("05", "02", 350, 1)]
+
+    order_df = spark.createDataFrame(orders_list).toDF("order_id", "prod_id", "unit_price", "qty")
+
+    product_list = [("01", "Scroll Mouse", 250, 20),
+                    ("02", "Optical Mouse", 350, 20),
+                    ("03", "Wireless Mouse", 450, 50),
+                    ("04", "Wireless Keyboard", 580, 50),
+                    ("05", "Standard Keyboard", 360, 10),
+                    ("06", "16 GB Flash Storage", 240, 100),
+                    ("07", "32 GB Flash Storage", 320, 50),
+                    ("08", "64 GB Flash Storage", 430, 25)]
+
+    product_df = spark.createDataFrame(product_list).toDF("prod_id", "prod_name", "list_price", "qty")
+
+    #product_df.show()
+    #order_df.show()
+
+    join_expr = order_df.prod_id == product_df.prod_id
+
+    '''
+    order_df.join(product_df, join_expr,"inner") \
+        .select("*") \
+        .show()
+    '''
+
+    product_renamed_df = product_df.withColumnRenamed("qty", "reorder_qty")
+
+    order_df.join(product_renamed_df, join_expr, "inner") \
+        .drop(product_renamed_df.prod_id)\
+        .select("order_id", "prod_id","prod_name", "unit_price", "qty") \
+        .show()
+
+-------------------------------------------------------------------------------------------------------------------
+
+## Outer Joins Dataframe
 
 
+--------------------------------------------------------------------------------------------------------------
+
+## Internals of Spark Join and shuffle
+
+-----------------------------------------------------------------------
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, monotonically_increasing_id, when, expr
+from pyspark.sql.types import *
+
+from lib.logger import Log4J
+
+if __name__ == "__main__":
+    spark = SparkSession \
+        .builder \
+        .appName("Shuffle Join Demo") \
+        .master("local[2]") \
+        .getOrCreate()
+
+    logger = Log4J(spark)
+
+    flight_time_df1 = spark.read.json("data/d1/")
+    flight_time_df2 = spark.read.json("data/d2/")
+
+    spark.conf.set("spark.sql.shuffle.partitions",3)
+
+    join_expr = flight_time_df1.id == flight_time_df2.id
+    join_df = flight_time_df1.join(flight_time_df2, join_expr, "inner")
+
+    join_df.foreach(lambda f: None)
+    input("Press a key to stop....")
+
+
+-----------------------------------------------------------------------
+http://localhost:4040/jobs/
+
+
+-----------------------------------------------------------------------------------
+## Optimizing your joins
+
+- Cut down the size of dataframe.
+- Broadcast Join can eliminant shuffle.
+
+http://localhost:4040/SQL/execution/?id=2
+----------------------------------------------------------------------------------------------------------------
+## Implementing Bucket Joins
+
+---------------------------------------------------------------------------------------
+
+from pyspark.sql import SparkSession
+
+
+from lib.logger import Log4J
+
+if __name__ == "__main__":
+    spark = SparkSession \
+        .builder \
+        .appName("Bucket Join Demo") \
+        .master("local[3]") \
+        .enableHiveSupport() \
+        .getOrCreate()
+
+    logger = Log4J(spark)
+
+    df1 = spark.read.json("data/d1/")
+    df2 = spark.read.json("data/d2/")
+    #df1.show()
+    #df2.show()
+
+    spark.sql("CREATE DATABASE IF NOT EXISTS MY_DB")
+    spark.sql("USE MY_DB")
+
+    '''
+    df1.coalesce(1).write \
+        .bucketBy(3, "id") \
+        .saveAsTable("MY_DB.flight_data1")
+
+    df2.coalesce(1).write \
+        .bucketBy(3, "id") \
+        .saveAsTable("MY_DB.flight_data2")
+    '''
+
+    df3 = spark.read.table("MY_DB.flight_data1")
+    df4 = spark.read.table("MY_DB.flight_data2")
+
+    spark.conf.set("spark.sql.autoBroadcastJoinThreshold", -1)  # to avoid the by default broadcast join.
+
+    join_expr = df3.id == df4.id
+    join_df = df3.join(df4, join_expr, "inner")
+
+    join_df.collect()
+    input("Press a key s stop...")
+	
+---------------------------------------------------------------------------------------------------
+
+
+http://localhost:4040/SQL/execution/?id=2
 
 %----------------------------------------- Section-11 Capstone Project ----------------------------------------------------%
 
